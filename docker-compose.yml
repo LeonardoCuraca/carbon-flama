@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: carbon-flama-db
+    restart: always
+    environment:
+      POSTGRES_USER: carbon_user
+      POSTGRES_PASSWORD: carbon_password
+      POSTGRES_DB: carbon_flama
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: carbon-flama-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://carbon_user:carbon_password@db:5432/carbon_flama?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-very-secret-key-123}
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
