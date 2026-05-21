@@ -30,10 +30,10 @@ export async function createOrder(tableId: number, items: any[], total: number) 
     }
   });
 
-  // 2. Actualizar el estado de la mesa
+  // 2. Actualizar el estado de la mesa (limpia también la nota de reserva)
   await prisma.table.update({
     where: { id: tableId },
-    data: { status: TableStatus.PEDIDO_ENVIADO }
+    data: { status: TableStatus.PEDIDO_ENVIADO, reservationNote: null }
   });
 
   revalidatePath("/dashboard/mozo");
@@ -119,6 +119,27 @@ export async function processPayment(orderId: string, amount: number, method: st
   revalidatePath("/dashboard/mozo");
 }
 
+export async function toggleReservation(tableId: number, note?: string) {
+  const table = await prisma.table.findUnique({ where: { id: tableId } });
+  if (!table) throw new Error("Mesa no encontrada");
+
+  if (table.status === TableStatus.RESERVADO) {
+    // Liberar la reserva
+    await prisma.table.update({
+      where: { id: tableId },
+      data: { status: TableStatus.DISPONIBLE, reservationNote: null }
+    });
+  } else if (table.status === TableStatus.DISPONIBLE) {
+    // Marcar como reservada
+    await prisma.table.update({
+      where: { id: tableId },
+      data: { status: TableStatus.RESERVADO, reservationNote: note || null }
+    });
+  }
+
+  revalidatePath("/dashboard/mozo");
+}
+
 export async function updateSupplyStock(supplyId: string, quantity: number) {
   const supply = await prisma.supply.update({
     where: { id: supplyId },
@@ -171,3 +192,4 @@ export async function getReadyItemsCount() {
     }
   });
 }
+

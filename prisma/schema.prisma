@@ -16,9 +16,7 @@ enum Role {
 
 enum TableStatus {
   DISPONIBLE
-  OCUPADA
   PEDIDO_ENVIADO
-  PENDIENTE_PAGO
   RESERVADO
 }
 
@@ -61,10 +59,11 @@ model User {
 }
 
 model Table {
-  id        Int         @id
-  status    TableStatus @default(DISPONIBLE)
-  zone      String      // Salón A, Salón B, Llevar
-  orders    Order[]
+  id              Int         @id
+  status          TableStatus @default(DISPONIBLE)
+  zone            String      // Salón A, Salón B, Terraza
+  reservationNote String?
+  orders          Order[]
 }
 
 model Category {
