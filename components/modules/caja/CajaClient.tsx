@@ -171,18 +171,53 @@ export default function CajaClient({ occupiedTables }: { occupiedTables: any[] }
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-6">
-              {selectedTable.orders[0]?.items.map((item: any) => (
-                <div key={item.id} className="flex justify-between items-start">
-                  <div className="flex gap-4">
-                    <span className="font-black text-orange-500">{item.quantity}</span>
-                    <div>
-                      <p className="font-bold text-sm">{item.product?.name}</p>
-                      <p className="text-xs text-zinc-500">Unit: S/ {item.product?.price.toFixed(2)}</p>
+              {selectedTable.orders[0]?.items.map((item: any) => {
+                let mods: any = null;
+                if (item.modifiers) {
+                  try {
+                    mods = typeof item.modifiers === "string" ? JSON.parse(item.modifiers) : item.modifiers;
+                  } catch (e) {
+                    mods = item.modifiers;
+                  }
+                }
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-4">
+                        <span className="font-black text-orange-500">{item.quantity}</span>
+                        <div>
+                          <p className="font-bold text-sm">{item.product?.name || item.name}</p>
+                          <p className="text-xs text-zinc-500">Unit: S/ {item.product?.price?.toFixed(2) || item.price?.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <span className="font-bold text-sm">S/ {item.subtotal.toFixed(2)}</span>
                     </div>
+
+                    {/* Modificadores */}
+                    {mods && Object.keys(mods).length > 0 && (
+                      <div className="pl-8 text-xs text-zinc-400 space-y-0.5">
+                        {Object.entries(mods).map(([key, val]: [string, any]) => {
+                          if (!val || (Array.isArray(val) && val.length === 0)) return null;
+                          const displayValue = Array.isArray(val) ? val.join(", ") : val;
+                          const displayName = key.charAt(0).toUpperCase() + key.slice(1);
+                          return (
+                            <p key={key}>
+                              <span className="text-zinc-500">{displayName}:</span> {displayValue}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Indicaciones especiales */}
+                    {item.notes && (
+                      <p className="pl-8 text-xs text-amber-500 italic">
+                        Nota: "{item.notes}"
+                      </p>
+                    )}
                   </div>
-                  <span className="font-bold text-sm">S/ {item.subtotal.toFixed(2)}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="p-8 border-t border-white/5 bg-black/40 space-y-6">

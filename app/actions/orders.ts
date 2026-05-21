@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { OrderStatus, TableStatus } from "@prisma/client";
+import { OrderStatus, TableStatus, OrderItemStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -57,6 +57,37 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   revalidatePath("/dashboard/cocina");
   revalidatePath("/dashboard/mozo");
   return order;
+}
+
+export async function updateOrderItemStatus(itemId: string, status: OrderItemStatus) {
+  const item = await prisma.orderItem.update({
+    where: { id: itemId },
+    data: { status },
+    include: { order: true }
+  });
+
+  // Recalcular el estado de la Orden general en base a sus ítems
+  const allItems = await prisma.orderItem.findMany({
+    where: { orderId: item.orderId }
+  });
+
+  let newOrderStatus: OrderStatus = OrderStatus.PENDIENTE;
+  if (allItems.every(i => i.status === OrderItemStatus.ENTREGADO)) {
+    newOrderStatus = OrderStatus.ENTREGADO;
+  } else if (allItems.every(i => i.status === OrderItemStatus.LISTO || i.status === OrderItemStatus.ENTREGADO)) {
+    newOrderStatus = OrderStatus.LISTO;
+  } else if (allItems.some(i => i.status === OrderItemStatus.EN_PREPARACION || i.status === OrderItemStatus.LISTO || i.status === OrderItemStatus.ENTREGADO)) {
+    newOrderStatus = OrderStatus.EN_PREPARACION;
+  }
+
+  await prisma.order.update({
+    where: { id: item.orderId },
+    data: { status: newOrderStatus }
+  });
+
+  revalidatePath("/dashboard/cocina");
+  revalidatePath("/dashboard/mozo");
+  return item;
 }
 
 export async function processPayment(orderId: string, amount: number, method: string) {
@@ -131,4 +162,12 @@ export async function deleteSupply(id: string) {
     where: { id }
   });
   revalidatePath("/dashboard/inventario");
+}
+
+export async function getReadyItemsCount() {
+  return await prisma.orderItem.count({
+    where: {
+      status: "LISTO"
+    }
+  });
 }

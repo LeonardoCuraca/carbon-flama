@@ -10,9 +10,40 @@ import {
   CheckCircle2,
   X
 } from "lucide-react";
-import { socket } from "@/lib/socket";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
+import { socket } from "@/lib/socket";
+
+function ElapsedTime({ createdAt }: { createdAt: string | Date }) {
+  const [elapsed, setElapsed] = useState("");
+
+  useEffect(() => {
+    const update = () => {
+      const diffMs = Date.now() - new Date(createdAt).getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) {
+        setElapsed("<1m");
+      } else if (diffMins < 60) {
+        setElapsed(`${diffMins}m`);
+      } else {
+        const hours = Math.floor(diffMins / 60);
+        const mins = diffMins % 60;
+        setElapsed(`${hours}h ${mins}m`);
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 30000);
+    return () => clearInterval(interval);
+  }, [createdAt]);
+
+  return (
+    <div className="flex items-center gap-1 text-[10px] font-black text-zinc-400">
+      <Clock className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+      <span>{elapsed}</span>
+    </div>
+  );
+}
 
 export default function MozoPageClient({ initialTables, initialZone }: { initialTables: any[], initialZone?: string }) {
   const [mounted, setMounted] = useState(false);
@@ -135,19 +166,44 @@ export default function MozoPageClient({ initialTables, initialZone }: { initial
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-        {tables.map((table) => (
-          <Link
-            key={table.id}
-            href={`/dashboard/mozo/order/${table.id}`}
-            className={`aspect-square rounded-3xl border-2 p-6 flex flex-col items-center justify-center gap-4 transition-all transform hover:scale-105 active:scale-95 ${getStatusColor(table.status)}`}
-          >
-            <span className="text-4xl font-black tracking-tighter">{table.id}</span>
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest bg-black/20 px-3 py-1 rounded-full">
-              {getStatusIcon(table.status)}
-              {table.status.replace("_", " ")}
-            </div>
-          </Link>
-        ))}
+        {tables.map((table) => {
+          const hasOrders = table.orders && table.orders.length > 0;
+          return (
+            <Link
+              key={table.id}
+              href={`/dashboard/mozo/order/${table.id}`}
+              className={`min-h-[175px] rounded-[32px] border-2 p-5 flex flex-col justify-between transition-all transform hover:scale-105 active:scale-95 ${getStatusColor(table.status)}`}
+            >
+              {/* Parte superior: Número de mesa y botón/icono de estado */}
+              <div className="flex justify-between items-start w-full">
+                <span className="text-4xl font-black tracking-tighter leading-none">{table.id}</span>
+                <div className="p-2 bg-black/20 rounded-xl flex-shrink-0">
+                  {getStatusIcon(table.status)}
+                </div>
+              </div>
+
+              {/* Parte central: Badge del estado */}
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest bg-black/20 px-2.5 py-1 rounded-full self-start">
+                {table.status.replace("_", " ")}
+              </div>
+
+              {/* Parte inferior: Información de pedidos, mozo y tiempo si tiene orden activa */}
+              {hasOrders && (
+                <div className="w-full pt-3 mt-1 border-t border-white/5 space-y-1.5 text-left">
+                  <p className="text-[10px] text-zinc-300 font-bold truncate flex items-center gap-1" title={table.orders[0].waiter.name}>
+                    <span className="text-zinc-500 font-normal">Mozo:</span> {table.orders[0].waiter.name}
+                  </p>
+                  <div className="flex justify-between items-center gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 bg-black/10 px-2 py-0.5 rounded">
+                      {table.orders.length} {table.orders.length === 1 ? 'pedido' : 'pedidos'}
+                    </span>
+                    <ElapsedTime createdAt={table.orders[0].createdAt} />
+                  </div>
+                </div>
+              )}
+            </Link>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-12 p-6 bg-[#141414] rounded-2xl border border-white/5">

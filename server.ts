@@ -31,6 +31,11 @@ app.prepare().then(() => {
       io.emit("status-changed", data);
     });
 
+    socket.on("update-item-status", (data) => {
+      console.log("Item status update:", data);
+      io.emit("item-status-changed", data);
+    });
+
     socket.on("disconnect", () => {
       console.log("Client disconnected:", socket.id);
     });

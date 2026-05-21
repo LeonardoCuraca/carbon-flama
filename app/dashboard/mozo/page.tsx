@@ -10,6 +10,25 @@ export default async function MozoPage({
   
   const tables = await prisma.table.findMany({
     where: zone ? { zone } : {},
+    include: {
+      orders: {
+        where: {
+          status: {
+            not: "PAGADO"
+          }
+        },
+        include: {
+          waiter: {
+            select: {
+              name: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "asc"
+        }
+      }
+    },
     orderBy: { id: "asc" },
   });
 

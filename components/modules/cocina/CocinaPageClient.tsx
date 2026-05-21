@@ -10,64 +10,106 @@ import {
   Check,
   AlertCircle
 } from "lucide-react";
-import { updateOrderStatus } from "@/app/actions/orders";
+import { updateOrderItemStatus } from "@/app/actions/orders";
 
-interface Order {
+interface KitchenItem {
   id: string;
+  orderId: string;
   tableId: number;
-  items: any[];
-  total: number;
-  createdAt: string | Date;
+  productId: string;
+  name: string;
+  quantity: number;
+  notes?: string;
+  modifiers?: any;
   status: string;
+  createdAt: string | Date;
 }
 
 export default function CocinaPageClient({ initialOrders }: { initialOrders: any[] }) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const getInitialItems = (ordersList: any[]): KitchenItem[] => {
+    return ordersList.flatMap(order => 
+      (order.items || []).map((item: any) => ({
+        id: item.id,
+        orderId: order.id,
+        tableId: order.tableId,
+        productId: item.productId,
+        name: item.product?.name || item.name,
+        quantity: item.quantity,
+        notes: item.notes,
+        modifiers: item.modifiers,
+        status: item.status,
+        createdAt: order.createdAt
+      }))
+    );
+  };
+
+  const [items, setItems] = useState<KitchenItem[]>(() => getInitialItems(initialOrders));
 
   useEffect(() => {
-    socket.on("order-update", (newOrder: Order) => {
-      // Evitar duplicados si ya existe por carga inicial
-      setOrders(prev => {
-        if (prev.find(o => o.id === newOrder.id)) return prev;
-        return [...prev, newOrder];
+    // Al recibir un nuevo pedido, aplanamos sus ítems y los agregamos a la lista
+    socket.on("order-update", (newOrder: any) => {
+      setItems(prev => {
+        const existingOrderItems = prev.filter(i => i.orderId === newOrder.id);
+        if (existingOrderItems.length > 0) return prev;
+
+        const newItems = (newOrder.items || []).map((item: any) => ({
+          id: item.id,
+          orderId: newOrder.id,
+          tableId: newOrder.tableId,
+          productId: item.productId,
+          name: item.product?.name || item.name,
+          quantity: item.quantity,
+          notes: item.notes,
+          modifiers: item.modifiers,
+          status: item.status || "PENDIENTE",
+          createdAt: newOrder.createdAt
+        }));
+        return [...prev, ...newItems];
       });
     });
 
-    socket.on("status-changed", (data: { id: string, status: string }) => {
-      setOrders(prev => prev.map(o => 
-        o.id === data.id ? { ...o, status: data.status } : o
+    // Al cambiar el estado de un plato individual
+    socket.on("item-status-changed", (data: { id: string, status: string }) => {
+      setItems(prev => prev.map(item => 
+        item.id === data.id ? { ...item, status: data.status } : item
       ));
+    });
+
+    // Si una orden se marca como PAGADA, removemos todos sus platos
+    socket.on("status-changed", (data: { id: string, status: string }) => {
+      if (data.status === "PAGADO") {
+        setItems(prev => prev.filter(item => item.orderId !== data.id));
+      }
     });
 
     return () => {
       socket.off("order-update");
+      socket.off("item-status-changed");
       socket.off("status-changed");
     };
   }, []);
 
   const handleUpdateStatus = async (id: string, status: string) => {
     try {
-      await updateOrderStatus(id, status as any);
-      socket.emit("update-status", { id, status });
+      await updateOrderItemStatus(id, status as any);
+      socket.emit("update-item-status", { id, status });
     } catch (error) {
       console.error(error);
     }
   };
 
-  const activeOrders = orders.filter(o => o.status !== "ENTREGADO" && o.status !== "PAGADO");
-  
-  const pendingOrders = activeOrders.filter(o => o.status === "PENDIENTE");
-  const inPreparationOrders = activeOrders.filter(o => o.status === "EN_PREPARACION");
-  const readyOrders = activeOrders.filter(o => o.status === "LISTO");
+  const pendingItems = items.filter(i => i.status === "PENDIENTE");
+  const inPreparationItems = items.filter(i => i.status === "EN_PREPARACION");
+  const readyItems = items.filter(i => i.status === "LISTO");
 
   return (
     <div className="space-y-8 h-[calc(100vh-140px)] flex flex-col">
       <div>
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
           <ChefHat className="w-8 h-8 text-orange-500" />
-          Monitor de Cocina
+          Monitor de Cocina (Platos)
         </h1>
-        <p className="text-zinc-500">Gestión de comandas en tiempo real</p>
+        <p className="text-zinc-500">Gestión de platos individuales en tiempo real</p>
       </div>
 
       <div className="flex-1 flex gap-6 overflow-hidden">
@@ -79,17 +121,23 @@ export default function CocinaPageClient({ initialOrders }: { initialOrders: any
               Pendientes
             </h2>
             <span className="bg-amber-500/20 text-amber-500 text-xs font-black px-2 py-1 rounded-md">
-              {pendingOrders.length}
+              {pendingItems.length}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-            {pendingOrders.map(order => (
-              <OrderCard key={order.id} order={order} onAction={() => handleUpdateStatus(order.id, "EN_PREPARACION")} actionIcon={<Play />} actionText="Preparar" />
+            {pendingItems.map(item => (
+              <ItemCard 
+                key={item.id} 
+                item={item} 
+                onAction={() => handleUpdateStatus(item.id, "EN_PREPARACION")} 
+                actionIcon={<Play className="w-4 h-4" />} 
+                actionText="Preparar" 
+              />
             ))}
           </div>
         </div>
 
-        {/* Columna: En Preparación */}
+        {/* Columna: En Cocina */}
         <div className="flex-1 flex flex-col bg-zinc-900/50 rounded-3xl border border-white/5 overflow-hidden">
           <div className="p-5 border-b border-white/5 bg-white/5 flex justify-between items-center">
             <h2 className="font-bold flex items-center gap-2 text-blue-500">
@@ -97,17 +145,24 @@ export default function CocinaPageClient({ initialOrders }: { initialOrders: any
               En Cocina
             </h2>
             <span className="bg-blue-500/20 text-blue-500 text-xs font-black px-2 py-1 rounded-md">
-              {inPreparationOrders.length}
+              {inPreparationItems.length}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-            {inPreparationOrders.map(order => (
-              <OrderCard key={order.id} order={order} onAction={() => handleUpdateStatus(order.id, "LISTO")} actionIcon={<Check />} actionText="Listo" variant="blue" />
+            {inPreparationItems.map(item => (
+              <ItemCard 
+                key={item.id} 
+                item={item} 
+                onAction={() => handleUpdateStatus(item.id, "LISTO")} 
+                actionIcon={<Check className="w-4 h-4" />} 
+                actionText="Listo" 
+                variant="blue" 
+              />
             ))}
           </div>
         </div>
 
-        {/* Columna: Listos */}
+        {/* Columna: Listos / Para Entrega */}
         <div className="flex-1 flex flex-col bg-zinc-900/50 rounded-3xl border border-white/5 overflow-hidden">
           <div className="p-5 border-b border-white/5 bg-white/5 flex justify-between items-center">
             <h2 className="font-bold flex items-center gap-2 text-emerald-500">
@@ -115,12 +170,19 @@ export default function CocinaPageClient({ initialOrders }: { initialOrders: any
               Para Entrega
             </h2>
             <span className="bg-emerald-500/20 text-emerald-500 text-xs font-black px-2 py-1 rounded-md">
-              {readyOrders.length}
+              {readyItems.length}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-            {readyOrders.map(order => (
-              <OrderCard key={order.id} order={order} onAction={() => handleUpdateStatus(order.id, "ENTREGADO")} actionIcon={<CheckCircle2 />} actionText="Entregar" variant="emerald" />
+            {readyItems.map(item => (
+              <ItemCard 
+                key={item.id} 
+                item={item} 
+                onAction={() => handleUpdateStatus(item.id, "ENTREGADO")} 
+                actionIcon={<CheckCircle2 className="w-4 h-4" />} 
+                actionText="Entregar" 
+                variant="emerald" 
+              />
             ))}
           </div>
         </div>
@@ -129,12 +191,12 @@ export default function CocinaPageClient({ initialOrders }: { initialOrders: any
   );
 }
 
-function OrderCard({ order, onAction, actionIcon, actionText, variant = "orange" }: any) {
+function ItemCard({ item, onAction, actionIcon, actionText, variant = "orange" }: { item: KitchenItem, onAction: () => void, actionIcon: React.ReactNode, actionText: string, variant?: string }) {
   const [timeElapsed, setTimeElapsed] = useState(0);
 
   useEffect(() => {
     const calculateTime = () => {
-      const start = new Date(order.createdAt).getTime();
+      const start = new Date(item.createdAt).getTime();
       const now = new Date().getTime();
       setTimeElapsed(Math.floor((now - start) / 60000));
     };
@@ -142,8 +204,8 @@ function OrderCard({ order, onAction, actionIcon, actionText, variant = "orange"
     calculateTime();
     const interval = setInterval(calculateTime, 60000);
     return () => clearInterval(interval);
-  }, [order.createdAt]);
-  
+  }, [item.createdAt]);
+
   const colors = {
     orange: "border-orange-500/20 bg-orange-500/5 hover:border-orange-500/40",
     blue: "border-blue-500/20 bg-blue-500/5 hover:border-blue-500/40",
@@ -156,12 +218,22 @@ function OrderCard({ order, onAction, actionIcon, actionText, variant = "orange"
     emerald: "bg-emerald-600 hover:bg-emerald-500"
   };
 
+  let mods: any = null;
+  if (item.modifiers) {
+    try {
+      mods = typeof item.modifiers === "string" ? JSON.parse(item.modifiers) : item.modifiers;
+    } catch (e) {
+      mods = item.modifiers;
+    }
+  }
+
   return (
     <div className={`p-4 rounded-2xl border-2 transition-all ${colors[variant as keyof typeof colors]}`}>
-      <div className="flex justify-between items-start mb-4">
+      {/* Cabecera de Tarjeta: Mesa + Tiempo */}
+      <div className="flex justify-between items-start mb-3">
         <div>
           <span className="text-xs font-black uppercase text-zinc-500 tracking-widest">Mesa</span>
-          <p className="text-2xl font-black leading-none">{order.tableId}</p>
+          <p className="text-2xl font-black leading-none">{item.tableId}</p>
         </div>
         <div className="flex items-center gap-1 text-xs font-bold text-zinc-400">
           <Clock className="w-3 h-3" />
@@ -169,20 +241,43 @@ function OrderCard({ order, onAction, actionIcon, actionText, variant = "orange"
         </div>
       </div>
 
-      <div className="space-y-2 mb-6 border-y border-white/5 py-4">
-        {order.items.map((item: any) => (
-          <div key={item.id} className="flex justify-between items-center text-sm">
-            <span className="font-bold text-zinc-200">
-              <span className="text-orange-500 mr-2">{item.quantity}x</span>
-              {item.product?.name || item.name}
-            </span>
+      {/* Info del Plato */}
+      <div className="space-y-2 mb-4 border-t border-white/5 pt-3">
+        <div className="text-sm">
+          <span className="font-bold text-zinc-200">
+            <span className="text-orange-500 mr-2">{item.quantity}x</span>
+            {item.name}
+          </span>
+        </div>
+
+        {/* Modificadores */}
+        {mods && Object.keys(mods).length > 0 && (
+          <div className="pl-6 text-xs text-zinc-400 space-y-0.5 border-l border-white/10 ml-2">
+            {Object.entries(mods).map(([key, val]: [string, any]) => {
+              if (!val || (Array.isArray(val) && val.length === 0)) return null;
+              const displayValue = Array.isArray(val) ? val.join(", ") : val;
+              const displayName = key.charAt(0).toUpperCase() + key.slice(1);
+              return (
+                <p key={key}>
+                  <span className="text-zinc-500">{displayName}:</span> {displayValue}
+                </p>
+              );
+            })}
           </div>
-        ))}
+        )}
+
+        {/* Indicaciones especiales */}
+        {item.notes && (
+          <p className="pl-6 text-xs text-amber-500 italic font-semibold">
+            ⚠️ "{item.notes}"
+          </p>
+        )}
       </div>
 
+      {/* Acciones */}
       <button
         onClick={onAction}
-        className={`w-full py-3 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 ${btnColors[variant as keyof typeof btnColors]}`}
+        className={`w-full py-3 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${btnColors[variant as keyof typeof btnColors]}`}
       >
         {actionIcon}
         {actionText}

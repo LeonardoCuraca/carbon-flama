@@ -65,6 +65,26 @@ export default function OrderCart({ tableId }: { tableId: number }) {
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
+              
+              {/* Modificadores y notas */}
+              {(item.modifiers || item.notes) && (
+                <div className="text-[11px] text-zinc-400 space-y-0.5 border-t border-white/5 pt-2">
+                  {item.modifiers && Object.entries(item.modifiers).map(([key, val]: [string, any]) => {
+                    if (!val || (Array.isArray(val) && val.length === 0)) return null;
+                    const displayValue = Array.isArray(val) ? val.join(", ") : val;
+                    const displayName = key.charAt(0).toUpperCase() + key.slice(1);
+                    return (
+                      <p key={key}>
+                        <span className="text-zinc-500">{displayName}:</span> {displayValue}
+                      </p>
+                    );
+                  })}
+                  {item.notes && (
+                    <p className="text-amber-500 italic font-semibold">⚠️ "{item.notes}"</p>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3 bg-white/5 rounded-lg p-1">
                   <button 

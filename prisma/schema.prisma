@@ -30,6 +30,13 @@ enum OrderStatus {
   PAGADO
 }
 
+enum OrderItemStatus {
+  PENDIENTE
+  EN_PREPARACION
+  LISTO
+  ENTREGADO
+}
+
 enum PaymentMethod {
   EFECTIVO
   TARJETA
@@ -76,6 +83,7 @@ model Product {
   categoryId  String
   category    Category    @relation(fields: [categoryId], references: [id])
   orderItems  OrderItem[]
+  optionGroups ProductOptionGroup[]
 }
 
 model Order {
@@ -95,15 +103,16 @@ model Order {
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   orderId     String
-  order       Order    @relation(fields: [orderId], references: [id])
+  order       Order           @relation(fields: [orderId], references: [id])
   productId   String
-  product     Product  @relation(fields: [productId], references: [id])
+  product     Product         @relation(fields: [productId], references: [id])
   quantity    Int
   notes       String?
   modifiers   Json?
   subtotal    Float
+  status      OrderItemStatus @default(PENDIENTE)
 }
 
 model Payment {
@@ -134,4 +143,22 @@ model Invoice {
   clientName    String
   totalAmount   Float
   issuedAt      DateTime @default(now())
+}
+
+model ProductOptionGroup {
+  id          String          @id @default(cuid())
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String          // "Salsas", "Acompañamiento", "Extras"
+  type        String          // "SINGLE" o "MULTIPLE"
+  required    Boolean         @default(false)
+  options     ProductOption[]
+}
+
+model ProductOption {
+  id          String             @id @default(cuid())
+  groupId     String
+  group       ProductOptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name        String             // "Mayonesa", "Ketchup", "Papas Fritas", "Huevo Frito"
+  price       Float              @default(0)
 }

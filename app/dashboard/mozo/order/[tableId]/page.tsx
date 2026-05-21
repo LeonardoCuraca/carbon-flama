@@ -15,7 +15,14 @@ export default async function OrderPage({
   const categories = await prisma.category.findMany({
     include: {
       products: {
-        where: { isAvailable: true }
+        where: { isAvailable: true },
+        include: {
+          optionGroups: {
+            include: {
+              options: true
+            }
+          }
+        }
       }
     }
   });
