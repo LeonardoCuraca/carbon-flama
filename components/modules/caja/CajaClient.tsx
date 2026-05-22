@@ -22,8 +22,15 @@ export default function CajaClient({ occupiedTables }: { occupiedTables: any[] }
   const [selectedTable, setSelectedTable] = useState<any>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showPrecuentaModal, setShowPrecuentaModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [docType, setDocType] = useState("BOLETA");
+  // Campos de comprobante (solo UI, no se guardan en BD)
+  const [includeDni, setIncludeDni] = useState(false);
+  const [dni, setDni] = useState("");
+  const [ruc, setRuc] = useState("");
+  const [razonSocial, setRazonSocial] = useState("");
+  const [direccion, setDireccion] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -68,11 +75,11 @@ export default function CajaClient({ occupiedTables }: { occupiedTables: any[] }
                 <div className="space-y-6">
                   <div>
                     <label className="text-xs font-black uppercase text-zinc-500 tracking-widest mb-3 block">Tipo de Comprobante</label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 mb-4">
                       {["BOLETA", "FACTURA"].map(t => (
                         <button
                           key={t}
-                          onClick={() => setDocType(t)}
+                          onClick={() => { setDocType(t); setIncludeDni(false); setDni(""); setRuc(""); setRazonSocial(""); setDireccion(""); }}
                           className={`py-4 rounded-2xl font-bold transition-all border-2 ${
                             docType === t ? "bg-orange-600 border-orange-500 text-white" : "bg-white/5 border-transparent text-zinc-400"
                           }`}
@@ -81,6 +88,61 @@ export default function CajaClient({ occupiedTables }: { occupiedTables: any[] }
                         </button>
                       ))}
                     </div>
+
+                    {/* Campos para BOLETA */}
+                    {docType === "BOLETA" && (
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                          <div
+                            onClick={() => setIncludeDni(v => !v)}
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
+                              includeDni ? "bg-orange-600 border-orange-500" : "bg-white/5 border-white/20"
+                            }`}
+                          >
+                            {includeDni && <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                          <span className="text-sm text-zinc-300 font-medium">Incluir DNI del cliente</span>
+                        </label>
+                        {includeDni && (
+                          <input
+                            type="text"
+                            value={dni}
+                            onChange={e => setDni(e.target.value)}
+                            placeholder="DNI del cliente"
+                            maxLength={8}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Campos para FACTURA */}
+                    {docType === "FACTURA" && (
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={ruc}
+                          onChange={e => setRuc(e.target.value)}
+                          placeholder="RUC *"
+                          maxLength={11}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                        <input
+                          type="text"
+                          value={razonSocial}
+                          onChange={e => setRazonSocial(e.target.value)}
+                          placeholder="Razón Social *"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                        <input
+                          type="text"
+                          value={direccion}
+                          onChange={e => setDireccion(e.target.value)}
+                          placeholder="Dirección (opcional)"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-black/40 p-6 rounded-3xl border border-white/5 text-center">
@@ -125,6 +187,106 @@ export default function CajaClient({ occupiedTables }: { occupiedTables: any[] }
                 >
                   Aceptar
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Precuenta */}
+          {showPrecuentaModal && selectedTable && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-white text-black w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 flex flex-col">
+                {/* Cabecera de boleta */}
+                <div className="bg-[#1a1a1a] text-white px-8 pt-8 pb-6 text-center">
+                  <div className="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Printer className="w-6 h-6 text-white" />
+                  </div>
+                  <h2 className="text-lg font-black tracking-tight">Carbón & Flama</h2>
+                  <p className="text-xs text-zinc-400 mt-0.5">Jr. La Parrilla 123, Lima</p>
+                  <div className="mt-4 pt-4 border-t border-white/10 flex justify-between text-xs text-zinc-400">
+                    <span>PRE-CUENTA</span>
+                    <span>Mesa {selectedTable.id}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-zinc-400 mt-1">
+                    <span>#{selectedTable.orders[0]?.id.slice(-8).toUpperCase()}</span>
+                    <span>{new Date().toLocaleString("es-PE", { hour12: true, hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" })}</span>
+                  </div>
+                </div>
+
+                {/* Cuerpo de boleta */}
+                <div className="p-6 space-y-3 max-h-64 overflow-y-auto">
+                  <div className="flex text-[10px] font-black uppercase text-zinc-400 tracking-widest border-b border-dashed border-zinc-200 pb-2">
+                    <span className="flex-1">Descripción</span>
+                    <span className="w-8 text-center">Cant</span>
+                    <span className="w-16 text-right">Precio</span>
+                    <span className="w-16 text-right">Total</span>
+                  </div>
+                  {selectedTable.orders[0]?.items.map((item: any) => (
+                    <div key={item.id} className="space-y-0.5">
+                      <div className="flex text-xs">
+                        <span className="flex-1 font-semibold text-zinc-800">{item.product?.name || item.name}</span>
+                        <span className="w-8 text-center text-zinc-500">{item.quantity}</span>
+                        <span className="w-16 text-right text-zinc-500">S/ {(item.product?.price || 0).toFixed(2)}</span>
+                        <span className="w-16 text-right font-bold">S/ {item.subtotal.toFixed(2)}</span>
+                      </div>
+                      {/* Modificadores */}
+                      {(() => {
+                        let mods: any = null;
+                        if (item.modifiers) {
+                          try { mods = typeof item.modifiers === "string" ? JSON.parse(item.modifiers) : item.modifiers; } catch {}
+                        }
+                        if (!mods || Object.keys(mods).length === 0) return null;
+                        return (
+                          <div className="pl-3 text-[10px] text-zinc-400 space-y-0.5">
+                            {Object.entries(mods).map(([k, v]: [string, any]) => {
+                              if (!v || (Array.isArray(v) && v.length === 0)) return null;
+                              return <p key={k}>{k.charAt(0).toUpperCase() + k.slice(1)}: {Array.isArray(v) ? v.join(", ") : v}</p>;
+                            })}
+                          </div>
+                        );
+                      })()}
+                      {item.notes && <p className="pl-3 text-[10px] text-amber-600 italic">* {item.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Totales */}
+                <div className="px-6 pb-4 space-y-1.5 border-t border-dashed border-zinc-200 pt-4">
+                  <div className="flex justify-between text-xs text-zinc-500">
+                    <span>Subtotal (sin IGV)</span>
+                    <span>S/ {(selectedTable.orders[0]?.total / 1.18).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-zinc-500">
+                    <span>IGV (18%)</span>
+                    <span>S/ {(selectedTable.orders[0]?.total - selectedTable.orders[0]?.total / 1.18).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-black text-zinc-900 border-t border-zinc-200 pt-2 mt-2">
+                    <span>TOTAL</span>
+                    <span>S/ {selectedTable.orders[0]?.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="bg-zinc-50 border-t border-zinc-200 px-6 py-4 text-center space-y-1">
+                  <p className="text-[10px] text-zinc-400 italic">Este documento es una pre-cuenta y no tiene valor fiscal</p>
+                  <p className="text-[10px] text-zinc-400">¡Gracias por su visita!</p>
+                </div>
+
+                {/* Botones */}
+                <div className="p-4 grid grid-cols-2 gap-3 bg-zinc-50">
+                  <button
+                    onClick={() => setShowPrecuentaModal(false)}
+                    className="py-3 rounded-2xl font-bold bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100 transition-all text-sm"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="py-3 rounded-2xl font-bold bg-[#1a1a1a] text-white hover:bg-black transition-all flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Imprimir
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -237,7 +399,9 @@ export default function CajaClient({ occupiedTables }: { occupiedTables: any[] }
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <button className="bg-white/5 hover:bg-white/10 py-4 rounded-2xl font-bold flex flex-col items-center justify-center gap-2 transition-all">
+                <button 
+                  onClick={() => setShowPrecuentaModal(true)}
+                  className="bg-white/5 hover:bg-white/10 py-4 rounded-2xl font-bold flex flex-col items-center justify-center gap-2 transition-all">
                   <Printer className="w-5 h-5" />
                   <span className="text-xs">Imp. Precuenta</span>
                 </button>

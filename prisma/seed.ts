@@ -36,6 +36,39 @@ async function main() {
     },
   });
 
+  await prisma.user.upsert({
+    where: { username: "cocina1" },
+    update: {},
+    create: {
+      username: "cocina1",
+      password: hashedPassword,
+      name: "Carlos Cocina",
+      role: Role.COCINA,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { username: "caja1" },
+    update: {},
+    create: {
+      username: "caja1",
+      password: hashedPassword,
+      name: "Ana Caja",
+      role: Role.CAJA,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { username: "inventario1" },
+    update: {},
+    create: {
+      username: "inventario1",
+      password: hashedPassword,
+      name: "Luis Inventario",
+      role: Role.INVENTARIO,
+    },
+  });
+
   // 2. Crear Mesas
   const zones = ["Salón A", "Salón B", "Terraza"];
   for (let i = 1; i <= 15; i++) {

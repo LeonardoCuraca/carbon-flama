@@ -6,7 +6,7 @@ export default async function CajaPage() {
   const occupiedTables = await prisma.table.findMany({
     where: {
       status: {
-        in: ["OCUPADA", "PEDIDO_ENVIADO", "PENDIENTE_PAGO"]
+        in: ["PEDIDO_ENVIADO"]
       }
     },
     include: {
